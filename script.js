@@ -1,15 +1,30 @@
-const langs = { uk: 'uk', de: 'de', en: 'en' };
+// --- derive real (non-"any") language codes from config ---
+const REAL_LANG_KEYS = Object.keys(LANGUAGES).filter(k => LANGUAGES[k].wikiCode);
+
 let currentLang = 'uk';
 
-const i18n = {
-  uk: { getBtn: 'ОТРИМАТИ ЦИТАТУ', placeholder: "тут з'явиться цитата з Wikiquote", loading: 'завантаження...', notFound: 'не вдалося знайти цитату, спробуйте ще раз', error: 'помилка запиту, спробуйте ще раз' },
-  de: { getBtn: 'ZITAT HOLEN', placeholder: 'hier erscheint ein Zitat von Wikiquote', loading: 'lädt...', notFound: 'kein Zitat gefunden, bitte erneut versuchen', error: 'Fehler bei der Anfrage, bitte erneut versuchen' },
-  en: { getBtn: 'GET QUOTE', placeholder: 'a quote from Wikiquote will appear here', loading: 'loading...', notFound: 'no quote found, try again', error: 'request failed, try again' },
-  any: { getBtn: 'ОТРИМАТИ ЦИТАТУ', placeholder: "тут з'явиться цитата з Wikiquote", loading: 'завантаження...', notFound: 'не вдалося знайти цитату, спробуйте ще раз', error: 'помилка запиту, спробуйте ще раз' },
-};
-
 function t(key) {
-  return (i18n[currentLang] || i18n.uk)[key];
+  const cfg = LANGUAGES[currentLang] || LANGUAGES.uk;
+  return cfg.ui[key];
+}
+
+// --- render language tabs from config ---
+function renderLangTabs() {
+  const container = document.getElementById('langs');
+  container.innerHTML = '';
+  for (const key of Object.keys(LANGUAGES)) {
+    const btn = document.createElement('button');
+    btn.dataset.lang = key;
+    btn.textContent = LANGUAGES[key].tabLabel;
+    if (key === currentLang) btn.classList.add('active');
+    container.appendChild(btn);
+  }
+}
+
+function setActiveLangTab(key) {
+  document.querySelectorAll('.langs button').forEach(b => {
+    b.classList.toggle('active', b.dataset.lang === key);
+  });
 }
 
 function applyUILang() {
@@ -23,11 +38,20 @@ function applyUILang() {
 document.getElementById('langs').addEventListener('click', (e) => {
   const btn = e.target.closest('button[data-lang]');
   if (!btn) return;
-  document.querySelectorAll('.langs button').forEach(b => b.classList.remove('active'));
-  btn.classList.add('active');
   currentLang = btn.dataset.lang;
+  setActiveLangTab(currentLang);
   applyUILang();
 });
+
+// --- device language auto-detect (works on install-as-PWA and on plain web too) ---
+function detectDefaultLang() {
+  const prefs = navigator.languages && navigator.languages.length ? navigator.languages : [navigator.language];
+  for (const pref of prefs) {
+    const primary = (pref || '').split('-')[0].toLowerCase();
+    if (REAL_LANG_KEYS.includes(primary)) return primary;
+  }
+  return 'uk'; // fallback
+}
 
 const themeToggle = document.getElementById('themeToggle');
 themeToggle.addEventListener('click', () => {
@@ -35,11 +59,10 @@ themeToggle.addEventListener('click', () => {
 });
 
 function pickWikiCode() {
-  if (currentLang === 'any') {
-    const codes = Object.values(langs);
-    return codes[Math.floor(Math.random() * codes.length)];
+  if (currentLang === 'any' || !LANGUAGES[currentLang].wikiCode) {
+    return REAL_LANG_KEYS[Math.floor(Math.random() * REAL_LANG_KEYS.length)];
   }
-  return langs[currentLang];
+  return LANGUAGES[currentLang].wikiCode;
 }
 
 function sleep(ms) {
@@ -118,22 +141,49 @@ function isPureWikilink(bulletBody) {
   return /^\[\[[^\]]+\]\]\.?\s*$/.test(bulletBody.trim());
 }
 
+// --- build combined filter regexes from the union of every configured real language ---
+function buildUnionRegex(words) {
+  const unique = [...new Set(words)];
+  return unique.length ? new RegExp(unique.join('|'), 'i') : null;
+}
+
+function collectField(field) {
+  const out = [];
+  for (const key of REAL_LANG_KEYS) {
+    const list = LANGUAGES[key][field];
+    if (list) out.push(...list);
+  }
+  return out;
+}
+
+const SKIP_SECTIONS_RE = buildUnionRegex([
+  ...CORE_SKIP_SECTION_WORDS,
+  ...collectField('skipSectionWords'),
+].map(w => `^${w}$`));
+
+const EXTERNAL_LINK_PHRASE_RE = buildUnionRegex(collectField('externalLinkPhrases'));
+const BIBLIOGRAPHY_WORD_RE = buildUnionRegex(collectField('bibliographyWords'));
+const PAGE_UNIT_RE = buildUnionRegex([
+  ...CORE_PAGE_UNIT_ABBREV,
+  ...collectField('pageUnitAbbrev'),
+].map(u => `\\d+\\s*(${u})\\s*$`));
+
 function looksLikeBibliography(cleaned) {
   if (/\bISBN\b/i.test(cleaned)) return true;
-  if (/\d+\s*(с\.|стор\.|pp?\.|S\.)\s*$/.test(cleaned)) return true;
-  if (/(Вступна стаття|Упорядкував|Переклад(ач)?:|Зібрані твори|Видавництво|Наклад)/i.test(cleaned)) return true;
-  // "Прізвище, Ім'я." at the very start, typical of a bibliography entry
+  if (PAGE_UNIT_RE && PAGE_UNIT_RE.test(cleaned)) return true;
+  if (BIBLIOGRAPHY_WORD_RE && BIBLIOGRAPHY_WORD_RE.test(cleaned)) return true;
+  // "Surname, Name." at the very start, combined with a year — typical of a bibliography entry.
+  // Latin + Cyrillic ranges only; languages using other scripts won't match this particular
+  // heuristic but still get the language-agnostic checks above.
   if (/^[А-ЯЇІЄҐA-Z][\wʼ'-]+,\s*[А-ЯЇІЄҐA-Z]/.test(cleaned) && /\d{4}/.test(cleaned)) return true;
   return false;
 }
 
 function looksLikeExternalLinkLine(cleaned) {
-  if (/\bна сайті\b|\bauf der (Website|Seite)\b|\bon the site\b/i.test(cleaned)) return true;
+  if (EXTERNAL_LINK_PHRASE_RE && EXTERNAL_LINK_PHRASE_RE.test(cleaned)) return true;
   if (/\b[\w-]+\.(com|org|net|ua|de|info)\b/i.test(cleaned)) return true;
   return false;
 }
-
-const SKIP_SECTIONS = /^(external links?|see also|references?|notes?|sources?|about|bibliography|further reading|citations?|джерела|бібліографія|посилання|зовнішні посилання|примітки|виноски|література|див\.?\s*також|quellen|weblinks|einzelnachweise|literatur|siehe auch)$/i;
 
 function extractQuoteLines(rawWikitext, title) {
   const wikitext = stripTemplatesAndComments(rawWikitext);
@@ -144,7 +194,7 @@ function extractQuoteLines(rawWikitext, title) {
     const trimmed = raw.trim();
     if (/^={2,}/.test(trimmed)) {
       const heading = trimmed.replace(/=/g, '').trim();
-      skipSection = SKIP_SECTIONS.test(heading);
+      skipSection = SKIP_SECTIONS_RE ? SKIP_SECTIONS_RE.test(heading) : false;
       continue;
     }
     if (skipSection) continue;
@@ -203,3 +253,8 @@ document.getElementById('copyBtn').addEventListener('click', () => {
   const text = document.getElementById('quote').textContent;
   navigator.clipboard.writeText(text).catch(() => {});
 });
+
+// --- init ---
+currentLang = detectDefaultLang();
+renderLangTabs();
+applyUILang();
