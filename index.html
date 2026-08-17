@@ -1,0 +1,318 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Wikiquote Random</title>
+<style>
+  :root {
+    --ink: #1a1a1a;
+    --muted: #a89a86;
+    --muted-active: #1a1a1a;
+    --rule: #e5e0d8;
+    --bg: #fefefe;
+  }
+  body.dark {
+    --ink: #eeeae3;
+    --muted: #7d7568;
+    --muted-active: #eeeae3;
+    --rule: #333029;
+    --bg: #16140f;
+  }
+  * { box-sizing: border-box; }
+  html, body {
+    height: 100%;
+    margin: 0;
+  }
+  body {
+    background: var(--bg);
+    color: var(--ink);
+    font-family: Georgia, 'Times New Roman', serif;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 100vh;
+    padding: 24px;
+    transition: background 0.2s ease, color 0.2s ease;
+  }
+  .theme-toggle {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    width: 36px;
+    height: 36px;
+    background: none;
+    border: 1px solid var(--rule);
+    border-radius: 50%;
+    color: var(--ink);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: opacity 0.15s ease;
+  }
+  .theme-toggle:hover { opacity: 0.6; }
+  .theme-toggle svg { width: 16px; height: 16px; }
+  .theme-toggle .moon { display: none; }
+  body.dark .theme-toggle .sun { display: none; }
+  body.dark .theme-toggle .moon { display: block; }
+  .wrap {
+    width: 100%;
+    max-width: 760px;
+    text-align: center;
+  }
+  .langs {
+    display: flex;
+    justify-content: center;
+    gap: 22px;
+    margin-bottom: 40px;
+    font-family: Arial, Helvetica, sans-serif;
+    font-size: 12px;
+    letter-spacing: 0.12em;
+  }
+  .langs button {
+    background: none;
+    border: none;
+    padding: 4px 0;
+    color: var(--muted);
+    cursor: pointer;
+    font-size: 12px;
+    letter-spacing: 0.12em;
+    font-family: inherit;
+    text-transform: uppercase;
+  }
+  .langs button.active {
+    color: var(--muted-active);
+    text-decoration: underline;
+    text-underline-offset: 5px;
+  }
+  #quote {
+    font-size: 24px;
+    line-height: 1.5;
+    min-height: 120px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0 8px;
+  }
+  #quote.placeholder {
+    color: var(--muted);
+    font-size: 16px;
+  }
+  .divider {
+    width: 60px;
+    height: 1px;
+    background: var(--rule);
+    margin: 32px auto;
+  }
+  .controls {
+    display: flex;
+    justify-content: center;
+    gap: 12px;
+  }
+  .btn {
+    font-family: Arial, Helvetica, sans-serif;
+    font-size: 12px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    background: none;
+    border: 1px solid var(--ink);
+    color: var(--ink);
+    padding: 14px 28px;
+    cursor: pointer;
+    transition: opacity 0.15s ease;
+  }
+  .btn:hover { opacity: 0.6; }
+  .btn:disabled { opacity: 0.35; cursor: default; }
+  .icon-btn {
+    width: 46px;
+    padding: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .icon-btn svg { width: 16px; height: 16px; }
+</style>
+</head>
+<body>
+
+<button class="theme-toggle" id="themeToggle" title="Toggle theme">
+  <svg class="sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+    <circle cx="12" cy="12" r="4.5"/>
+    <path d="M12 2.5v2.5M12 19v2.5M4.2 4.2l1.8 1.8M18 18l1.8 1.8M2.5 12H5M19 12h2.5M4.2 19.8L6 18M18 6l1.8-1.8"/>
+  </svg>
+  <svg class="moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+    <path d="M20 14.5A8.5 8.5 0 1 1 9.5 4a7 7 0 0 0 10.5 10.5z"/>
+  </svg>
+</button>
+
+<div class="wrap">
+  <div class="langs" id="langs">
+    <button data-lang="uk" class="active">УКР</button>
+    <button data-lang="de">DEU</button>
+    <button data-lang="en">ENG</button>
+    <button data-lang="any">БУДЬ-ЯКА</button>
+  </div>
+
+  <div id="quote" class="placeholder" data-i18n="placeholder">тут з'явиться цитата з Wikiquote</div>
+
+  <div class="divider"></div>
+
+  <div class="controls">
+    <button class="btn" id="getBtn">ОТРИМАТИ ЦИТАТУ</button>
+    <button class="btn icon-btn" id="copyBtn" title="Copy">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+        <rect x="9" y="9" width="12" height="12" rx="1"/>
+        <path d="M5 15H4a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v1"/>
+      </svg>
+    </button>
+  </div>
+</div>
+
+<script>
+const langs = { uk: 'uk', de: 'de', en: 'en' };
+let currentLang = 'uk';
+
+const i18n = {
+  uk: { getBtn: 'ОТРИМАТИ ЦИТАТУ', placeholder: "тут з'явиться цитата з Wikiquote", loading: 'завантаження...', notFound: 'не вдалося знайти цитату, спробуйте ще раз', error: 'помилка запиту, спробуйте ще раз' },
+  de: { getBtn: 'ZITAT HOLEN', placeholder: 'hier erscheint ein Zitat von Wikiquote', loading: 'lädt...', notFound: 'kein Zitat gefunden, bitte erneut versuchen', error: 'Fehler bei der Anfrage, bitte erneut versuchen' },
+  en: { getBtn: 'GET QUOTE', placeholder: 'a quote from Wikiquote will appear here', loading: 'loading...', notFound: 'no quote found, try again', error: 'request failed, try again' },
+  any: { getBtn: 'ОТРИМАТИ ЦИТАТУ', placeholder: "тут з'явиться цитата з Wikiquote", loading: 'завантаження...', notFound: 'не вдалося знайти цитату, спробуйте ще раз', error: 'помилка запиту, спробуйте ще раз' },
+};
+
+function t(key) {
+  return (i18n[currentLang] || i18n.uk)[key];
+}
+
+function applyUILang() {
+  document.getElementById('getBtn').textContent = t('getBtn');
+  const quoteEl = document.getElementById('quote');
+  if (quoteEl.classList.contains('placeholder')) {
+    quoteEl.textContent = t('placeholder');
+  }
+}
+
+document.getElementById('langs').addEventListener('click', (e) => {
+  const btn = e.target.closest('button[data-lang]');
+  if (!btn) return;
+  document.querySelectorAll('.langs button').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  currentLang = btn.dataset.lang;
+  applyUILang();
+});
+
+const themeToggle = document.getElementById('themeToggle');
+themeToggle.addEventListener('click', () => {
+  document.body.classList.toggle('dark');
+});
+
+function pickWikiCode() {
+  if (currentLang === 'any') {
+    const codes = Object.values(langs);
+    return codes[Math.floor(Math.random() * codes.length)];
+  }
+  return langs[currentLang];
+}
+
+async function fetchRandomTitle(code) {
+  const url = `https://${code}.wikiquote.org/w/api.php?action=query&list=random&rnnamespace=0&rnfilterredir=nonredirects&rnlimit=1&format=json&origin=*`;
+  const res = await fetch(url);
+  const data = await res.json();
+  return data.query.random[0].title;
+}
+
+async function fetchWikitext(code, title) {
+  const url = `https://${code}.wikiquote.org/w/api.php?action=query&prop=revisions&rvslots=main&rvprop=content&titles=${encodeURIComponent(title)}&format=json&origin=*`;
+  const res = await fetch(url);
+  const data = await res.json();
+  const pages = data.query.pages;
+  const page = Object.values(pages)[0];
+  const rev = page && page.revisions && page.revisions[0];
+  return rev ? rev.slots.main['*'] : '';
+}
+
+function cleanWikitext(line) {
+  let t = line;
+  t = t.replace(/<ref[^>]*\/>/gi, '');
+  t = t.replace(/<ref[^>]*>[\s\S]*?<\/ref>/gi, '');
+  t = t.replace(/<!--[\s\S]*?-->/g, '');
+  // strip templates {{...}}, allow one level of nesting
+  for (let i = 0; i < 3; i++) {
+    t = t.replace(/\{\{[^{}]*\}\}/g, '');
+  }
+  t = t.replace(/\[\[([^\]|]*\|)?([^\]]+)\]\]/g, '$2');
+  t = t.replace(/\[(https?:\/\/[^\s\]]+)\s+([^\]]+)\]/g, '$2');
+  t = t.replace(/\[(https?:\/\/[^\s\]]+)\]/g, '');
+  t = t.replace(/'''''/g, '').replace(/'''/g, '').replace(/''/g, '');
+  t = t.replace(/<[^>]+>/g, '');
+  t = t.replace(/^\*+\s*/, '');
+  t = t.replace(/\s+/g, ' ').trim();
+  return t;
+}
+
+function extractQuoteLines(wikitext, title) {
+  const rawLines = wikitext.split('\n');
+  const result = [];
+  let skipSection = false;
+  for (const raw of rawLines) {
+    const trimmed = raw.trim();
+    if (/^={2,}/.test(trimmed)) {
+      const heading = trimmed.replace(/=/g, '').trim();
+      skipSection = /^(external links|see also|references|notes|sources|about)$/i.test(heading);
+      continue;
+    }
+    if (skipSection) continue;
+    // only top-level bullets: "* text", not "** text" (those are citations)
+    if (!/^\*(?!\*)/.test(trimmed)) continue;
+    const cleaned = cleanWikitext(trimmed);
+    if (!cleaned || cleaned === title) continue;
+    if (cleaned.length < 15 || cleaned.length > 400) continue;
+    if (!/[a-zA-Zà-žÀ-Žа-яА-ЯіїєґІЇЄҐ]/.test(cleaned)) continue;
+    if (/^\{\{/.test(trimmed)) continue;
+    result.push(cleaned);
+  }
+  return result;
+}
+
+async function getQuote() {
+  const getBtn = document.getElementById('getBtn');
+  const quoteEl = document.getElementById('quote');
+  getBtn.disabled = true;
+  quoteEl.classList.add('placeholder');
+  quoteEl.textContent = t('loading');
+
+  const code = pickWikiCode();
+  let attempts = 0;
+
+  try {
+    while (attempts < 6) {
+      attempts++;
+      const title = await fetchRandomTitle(code);
+      const wikitext = await fetchWikitext(code, title);
+      if (!wikitext || /^#REDIRECT/i.test(wikitext.trim())) continue;
+      const candidates = extractQuoteLines(wikitext, title);
+      if (candidates.length > 0) {
+        const quote = candidates[Math.floor(Math.random() * candidates.length)];
+        quoteEl.classList.remove('placeholder');
+        quoteEl.textContent = quote;
+        getBtn.disabled = false;
+        return;
+      }
+    }
+    quoteEl.textContent = t('notFound');
+  } catch (err) {
+    quoteEl.textContent = t('error');
+  }
+  getBtn.disabled = false;
+}
+
+document.getElementById('getBtn').addEventListener('click', getQuote);
+
+document.getElementById('copyBtn').addEventListener('click', () => {
+  const text = document.getElementById('quote').textContent;
+  navigator.clipboard.writeText(text).catch(() => {});
+});
+</script>
+
+</body>
+</html>
