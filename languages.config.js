@@ -73,20 +73,6 @@ const LANGUAGES = {
     bibliographyWords: ['Editor', 'Publisher', 'Translated by'],
     pageUnitAbbrev: ['pp?\\.'],
   },
-
-  any: {
-    tabLabel: 'БУДЬ-ЯКА',
-    wikiCode: null,
-    // "any" mirrors the uk interface strings; it has no filter word lists of
-    // its own since filtering always uses the union of every real language below.
-    ui: {
-      getBtn: 'ОТРИМАТИ ЦИТАТУ',
-      placeholder: "тут з'явиться цитата з Wikiquote",
-      loading: 'завантаження...',
-      notFound: 'не вдалося знайти цитату, спробуйте ще раз',
-      error: 'помилка запиту, спробуйте ще раз',
-    },
-  },
 };
 
 // Language-agnostic fallback words, always included regardless of which
