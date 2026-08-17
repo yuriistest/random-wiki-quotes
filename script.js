@@ -1,0 +1,205 @@
+const langs = { uk: 'uk', de: 'de', en: 'en' };
+let currentLang = 'uk';
+
+const i18n = {
+  uk: { getBtn: 'ОТРИМАТИ ЦИТАТУ', placeholder: "тут з'явиться цитата з Wikiquote", loading: 'завантаження...', notFound: 'не вдалося знайти цитату, спробуйте ще раз', error: 'помилка запиту, спробуйте ще раз' },
+  de: { getBtn: 'ZITAT HOLEN', placeholder: 'hier erscheint ein Zitat von Wikiquote', loading: 'lädt...', notFound: 'kein Zitat gefunden, bitte erneut versuchen', error: 'Fehler bei der Anfrage, bitte erneut versuchen' },
+  en: { getBtn: 'GET QUOTE', placeholder: 'a quote from Wikiquote will appear here', loading: 'loading...', notFound: 'no quote found, try again', error: 'request failed, try again' },
+  any: { getBtn: 'ОТРИМАТИ ЦИТАТУ', placeholder: "тут з'явиться цитата з Wikiquote", loading: 'завантаження...', notFound: 'не вдалося знайти цитату, спробуйте ще раз', error: 'помилка запиту, спробуйте ще раз' },
+};
+
+function t(key) {
+  return (i18n[currentLang] || i18n.uk)[key];
+}
+
+function applyUILang() {
+  document.getElementById('getBtn').textContent = t('getBtn');
+  const quoteEl = document.getElementById('quote');
+  if (quoteEl.classList.contains('placeholder')) {
+    quoteEl.textContent = t('placeholder');
+  }
+}
+
+document.getElementById('langs').addEventListener('click', (e) => {
+  const btn = e.target.closest('button[data-lang]');
+  if (!btn) return;
+  document.querySelectorAll('.langs button').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  currentLang = btn.dataset.lang;
+  applyUILang();
+});
+
+const themeToggle = document.getElementById('themeToggle');
+themeToggle.addEventListener('click', () => {
+  document.body.classList.toggle('dark');
+});
+
+function pickWikiCode() {
+  if (currentLang === 'any') {
+    const codes = Object.values(langs);
+    return codes[Math.floor(Math.random() * codes.length)];
+  }
+  return langs[currentLang];
+}
+
+function sleep(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+async function fetchJson(url) {
+  const res = await fetch(url);
+  if (res.status === 429 || res.status === 503) {
+    const retryAfter = parseFloat(res.headers.get('Retry-After')) || 1;
+    await sleep(Math.min(retryAfter, 3) * 1000);
+    throw new Error('rate-limited');
+  }
+  if (!res.ok) {
+    throw new Error('http-' + res.status);
+  }
+  return res.json();
+}
+
+async function fetchRandomTitle(code) {
+  const url = `https://${code}.wikiquote.org/w/api.php?action=query&list=random&rnnamespace=0&rnfilterredir=nonredirects&rnlimit=1&format=json&origin=*`;
+  const data = await fetchJson(url);
+  return data.query.random[0].title;
+}
+
+async function fetchWikitext(code, title) {
+  const url = `https://${code}.wikiquote.org/w/api.php?action=query&prop=revisions&rvslots=main&rvprop=content&titles=${encodeURIComponent(title)}&format=json&origin=*`;
+  const data = await fetchJson(url);
+  const pages = data.query.pages;
+  const page = Object.values(pages)[0];
+  if (!page || page.missing !== undefined) return '';
+  const rev = page.revisions && page.revisions[0];
+  return rev ? rev.slots.main['*'] : '';
+}
+
+function stripTemplatesAndComments(wikitext) {
+  let t = wikitext;
+  t = t.replace(/<!--[\s\S]*?-->/g, '');
+  t = t.replace(/<ref[^>]*\/>/gi, '');
+  t = t.replace(/<ref[^>]*>[\s\S]*?<\/ref>/gi, '');
+  // templates can span multiple lines and nest one level deep; strip innermost-first, a few passes
+  for (let i = 0; i < 5; i++) {
+    const before = t;
+    t = t.replace(/\{\{[^{}]*\}\}/g, '');
+    if (t === before) break;
+  }
+  return t;
+}
+
+function decodeEntities(t) {
+  return t
+    .replace(/&nbsp;/g, ' ')
+    .replace(/&mdash;/g, '—')
+    .replace(/&ndash;/g, '–')
+    .replace(/&amp;/g, '&')
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/&laquo;/g, '«')
+    .replace(/&raquo;/g, '»');
+}
+
+function cleanWikitext(line) {
+  let t = line;
+  t = t.replace(/\[\[([^\]|]*\|)?([^\]]+)\]\]/g, '$2');
+  t = t.replace(/\[(https?:\/\/[^\s\]]+)\s+([^\]]+)\]/g, '$2');
+  t = t.replace(/\[(https?:\/\/[^\s\]]+)\]/g, '');
+  t = t.replace(/'''''/g, '').replace(/'''/g, '').replace(/''/g, '');
+  t = t.replace(/<[^>]+>/g, '');
+  t = t.replace(/^\*+\s*/, '');
+  t = decodeEntities(t);
+  t = t.replace(/\s+/g, ' ').trim();
+  return t;
+}
+
+function isPureWikilink(bulletBody) {
+  return /^\[\[[^\]]+\]\]\.?\s*$/.test(bulletBody.trim());
+}
+
+function looksLikeBibliography(cleaned) {
+  if (/\bISBN\b/i.test(cleaned)) return true;
+  if (/\d+\s*(с\.|стор\.|pp?\.|S\.)\s*$/.test(cleaned)) return true;
+  if (/(Вступна стаття|Упорядкував|Переклад(ач)?:|Зібрані твори|Видавництво|Наклад)/i.test(cleaned)) return true;
+  // "Прізвище, Ім'я." at the very start, typical of a bibliography entry
+  if (/^[А-ЯЇІЄҐA-Z][\wʼ'-]+,\s*[А-ЯЇІЄҐA-Z]/.test(cleaned) && /\d{4}/.test(cleaned)) return true;
+  return false;
+}
+
+function looksLikeExternalLinkLine(cleaned) {
+  if (/\bна сайті\b|\bauf der (Website|Seite)\b|\bon the site\b/i.test(cleaned)) return true;
+  if (/\b[\w-]+\.(com|org|net|ua|de|info)\b/i.test(cleaned)) return true;
+  return false;
+}
+
+const SKIP_SECTIONS = /^(external links?|see also|references?|notes?|sources?|about|bibliography|further reading|citations?|джерела|бібліографія|посилання|зовнішні посилання|примітки|виноски|література|див\.?\s*також|quellen|weblinks|einzelnachweise|literatur|siehe auch)$/i;
+
+function extractQuoteLines(rawWikitext, title) {
+  const wikitext = stripTemplatesAndComments(rawWikitext);
+  const rawLines = wikitext.split('\n');
+  const result = [];
+  let skipSection = false;
+  for (const raw of rawLines) {
+    const trimmed = raw.trim();
+    if (/^={2,}/.test(trimmed)) {
+      const heading = trimmed.replace(/=/g, '').trim();
+      skipSection = SKIP_SECTIONS.test(heading);
+      continue;
+    }
+    if (skipSection) continue;
+    // only top-level bullets: "* text", not "** text" (those are citations)
+    if (!/^\*(?!\*)/.test(trimmed)) continue;
+    const bulletBody = trimmed.replace(/^\*+\s*/, '');
+    if (isPureWikilink(bulletBody)) continue;
+    const cleaned = cleanWikitext(trimmed);
+    if (!cleaned || cleaned.toLowerCase() === title.toLowerCase()) continue;
+    if (cleaned.length < 15 || cleaned.length > 400) continue;
+    if (!/[a-zA-Zà-žÀ-Žа-яА-ЯіїєґІЇЄҐ]/.test(cleaned)) continue;
+    if (looksLikeBibliography(cleaned)) continue;
+    if (looksLikeExternalLinkLine(cleaned)) continue;
+    result.push(cleaned);
+  }
+  return result;
+}
+
+async function getQuote() {
+  const getBtn = document.getElementById('getBtn');
+  const quoteEl = document.getElementById('quote');
+  getBtn.disabled = true;
+  quoteEl.classList.add('placeholder');
+  quoteEl.textContent = t('loading');
+
+  const code = pickWikiCode();
+  const maxAttempts = 8;
+  let attempts = 0;
+
+  while (attempts < maxAttempts) {
+    attempts++;
+    try {
+      const title = await fetchRandomTitle(code);
+      const wikitext = await fetchWikitext(code, title);
+      if (!wikitext || /^#REDIRECT/i.test(wikitext.trim())) continue;
+      const candidates = extractQuoteLines(wikitext, title);
+      if (candidates.length > 0) {
+        const quote = candidates[Math.floor(Math.random() * candidates.length)];
+        quoteEl.classList.remove('placeholder');
+        quoteEl.textContent = quote;
+        getBtn.disabled = false;
+        return;
+      }
+    } catch (err) {
+      // single request failed (404, network blip, rate limit) — just try another random page
+      continue;
+    }
+  }
+  quoteEl.textContent = t('notFound');
+  getBtn.disabled = false;
+}
+
+document.getElementById('getBtn').addEventListener('click', getQuote);
+
+document.getElementById('copyBtn').addEventListener('click', () => {
+  const text = document.getElementById('quote').textContent;
+  navigator.clipboard.writeText(text).catch(() => {});
+});
