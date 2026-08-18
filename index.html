@@ -1,15 +1,20 @@
 <!DOCTYPE html>
-<html lang="uk" translate="no">
+<html lang="uk">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<meta name="google" content="notranslate">
 <title>Wikiquote Random</title>
 <link rel="stylesheet" href="style.css">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<meta name="theme-color" content="#fefefe">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
 </head>
-<body class="notranslate">
+<body>
 
-<button class="theme-toggle" id="themeToggle" title="Toggle theme">
+<button class="theme-toggle notranslate" id="themeToggle" translate="no" title="Toggle theme">
   <svg class="sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
     <circle cx="12" cy="12" r="4.5"/>
     <path d="M12 2.5v2.5M12 19v2.5M4.2 4.2l1.8 1.8M18 18l1.8 1.8M2.5 12H5M19 12h2.5M4.2 19.8L6 18M18 6l1.8-1.8"/>
@@ -20,13 +25,18 @@
 </button>
 
 <div class="wrap">
-  <div class="langs" id="langs"></div>
+  <div class="langs notranslate" id="langs" translate="no"></div>
 
   <div id="quote" class="placeholder" data-i18n="placeholder">тут з'явиться цитата з Wikiquote</div>
 
   <div class="divider"></div>
 
-  <div class="controls">
+  <div class="controls notranslate" translate="no">
+    <a class="btn icon-btn disabled" id="sourceLink" target="_blank" rel="noopener noreferrer" title="Open source" aria-disabled="true">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+        <path d="M14 4h6v6M20 4l-9 9M9 5H5a1 1 0 0 0-1 1v13a1 1 0 0 0 1 1h13a1 1 0 0 0 1-1v-4"/>
+      </svg>
+    </a>
     <button class="btn" id="getBtn">ОТРИМАТИ ЦИТАТУ</button>
     <button class="btn icon-btn" id="copyBtn" title="Copy">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
@@ -35,6 +45,12 @@
       </svg>
     </button>
   </div>
+</div>
+
+<div class="install-banner notranslate" id="installBanner" translate="no">
+  <span id="installBannerText"></span>
+  <button id="installBannerAction" class="install-banner-action"></button>
+  <button id="installBannerClose" class="install-banner-close" aria-label="Close">&times;</button>
 </div>
 
 <script src="languages.config.js"></script>
