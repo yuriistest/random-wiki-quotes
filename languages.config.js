@@ -24,6 +24,9 @@ const LANGUAGES = {
       loading: 'завантаження...',
       notFound: 'не вдалося знайти цитату, спробуйте ще раз',
       error: 'помилка запиту, спробуйте ще раз',
+      installPrompt: 'Встановити застосунок на телефон?',
+      installAction: 'Встановити',
+      iosInstallPrompt: 'Додайте застосунок на головний екран: Поділитися → «На екран Домівка»',
     },
     skipSectionWords: [
       'джерела', 'бібліографія', 'посилання', 'зовнішні посилання',
@@ -46,6 +49,9 @@ const LANGUAGES = {
       loading: 'lädt...',
       notFound: 'kein Zitat gefunden, bitte erneut versuchen',
       error: 'Fehler bei der Anfrage, bitte erneut versuchen',
+      installPrompt: 'App auf dem Smartphone installieren?',
+      installAction: 'Installieren',
+      iosInstallPrompt: 'Zum Home-Bildschirm hinzufügen: Teilen → „Zum Home-Bildschirm“',
     },
     skipSectionWords: [
       'quellen', 'weblinks', 'einzelnachweise', 'literatur', 'siehe auch',
@@ -64,6 +70,9 @@ const LANGUAGES = {
       loading: 'loading...',
       notFound: 'no quote found, try again',
       error: 'request failed, try again',
+      installPrompt: 'Install this app on your phone?',
+      installAction: 'Install',
+      iosInstallPrompt: 'Add to your home screen: Share → "Add to Home Screen"',
     },
     skipSectionWords: [
       'external links?', 'see also', 'references?', 'notes?', 'sources?',
